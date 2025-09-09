@@ -71,23 +71,23 @@ Unlike most tools on GitHub:
 ### Interactive Mode 
 **Prompts for domain selection and includes all account types**
 ```powershell
-.\PasswordNeverExpiresAnalyzer.ps1
+.\PasswordNeverExpires.ps1
 ```
 
 
 ### Specific Domain Analysis
 ```powershell
-.\PasswordNeverExpiresAnalyzer.ps1 -DomainInput "example.com"
+.\PasswordNeverExpires.ps1 -DomainInput "example.com"
 ```
 ### Users Only
 
 ```powershell
-.\PasswordNeverExpiresAnalyzer.ps1 -IncludeUsers -OutputPath "C:\Audit\UsersNeverExpire.csv"
+.\PasswordNeverExpires.ps1 -IncludeUsers -OutputPath "C:\Audit\UsersNeverExpire.csv"
 ```
 ### Computers Only
 
 ```powershell
-.\PasswordNeverExpiresAnalyzer.ps1 -IncludeComputers -DomainInput "subsidiary.company.com"
+.\PasswordNeverExpires.ps1 -IncludeComputers -DomainInput "subsidiary.company.com"
 ```
 
 ### Cross-Domain Analysis
