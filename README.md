@@ -1,130 +1,122 @@
 # Password Never Expires Analyzer
 
-
-This PowerShell script enumerates all **Active Directory user and computer accounts** with the  
+This PowerShell script enumerates all **Active Directory user and computer accounts** with the
 **"Password Never Expires"** flag enabled and exports the results to a CSV file.
 
 ---
+
 ## Purpose
 The **Password Never Expires** flag in Active Directory presents a significant security risk as these accounts:
 - Never require password changes, potentially using weak or compromised passwords indefinitely
 - May represent forgotten service accounts, abandoned user accounts, or misconfigured systems
 - Can serve as persistence mechanisms for attackers who compromise them
 - Often have elevated privileges but lack proper monitoring
----
 
-##  Key Features
--  Detects all AD accounts (users and computers) with **non-expiring passwords**  
--  Works **without the Active Directory PowerShell module** 
--  Uses only built-in **.NET System.DirectoryServices** classes 
--  Compatible with **any Windows environment** with domain connectivity  
--  Exports results to a CSV file with attributes:
-   - Name  
-   - Creation Date  
-   - Last Logon  
-   - Last Password Set  
-   - Distinguished Name  
--  Can run **without admin privileges**, only read access to AD is required  
+Regularly reviewing and remediating accounts with non-expiring passwords is essential to reduce persistent threat risks.
 
 ---
 
-## Why This Matters
-
-Accounts with **"Password Never Expires"** pose a significant security risk:  
-
-- If compromised, an attacker can **maintain access indefinitely**, because the password never expires.  
-- Especially dangerous for **administrative or critical service accounts**, allowing long-term persistence.  
-- Attackers can **move laterally, exfiltrate data, or manipulate systems** without being locked out.  
-
-Regularly reviewing and remediating accounts with non-expiring passwords is essential to **reduce persistent threat risks**.
-
----
-
-##  Why This Script Is Unique
-Unlike most tools on GitHub:  
-- Other tools require **Active Directory Module** (e.g., `Get-ADUser`, `Get-ADComputer`).  
-- **This script has zero dependencies**:  
-  - ✅ Runs on any Windows system  
-  - ✅ No extra AD modules required  
-  - ✅ **No admin privileges needed**; only read access to AD  
-  - ✅ Usable in **restricted customer environments**  
+## Key Features
+- Detects all AD accounts (users and computers) with **non-expiring passwords**
+- Works **without the Active Directory PowerShell module**. It uses only built-in **System.DirectoryServices** classes, so it runs in restricted environments where extra modules cannot be installed
+- Can run **without admin privileges**; only read access to AD is required
+- Can target a **specific domain controller** with the `-Server` parameter
+- Paged LDAP queries (1000 objects per page), suitable for large domains
+- Exports results to CSV with:
+  - Name
+  - Type (User / Computer)
+  - Enabled (account enabled or disabled)
+  - Creation date
+  - Last logon
+  - Password last set
+  - Distinguished Name
+- All timestamps in the CSV are written in **UTC** using a sortable `yyyy-MM-dd HH:mm:ss` format
+- Prints a summary after export (totals, disabled accounts, accounts with no recorded logon or password-set date)
 
 ---
-
 
 ## How It Works
-1. **Domain Detection**: Automatically detects current domain or accepts manual input
-2. **LDAP Query Construction**: Builds optimized LDAP filters for password never expires accounts
-3. **Data Collection**: Retrieves account properties including:
-   - **Name and Distinguished Name**
-   - **Creation timestamp**
-   - **Last logon information**
-   - **Password last set date**
-4. **Date Processing**: Converts various date formats (FileTime, GeneralizedTime) to readable format
-5. **CSV Export**: Generates detailed reports with proper encoding
-
+1. **Domain Detection**: Automatically detects the current domain or accepts manual input (domain name or DN)
+2. **LDAP Query Construction**: Builds LDAP filters matching the `DONT_EXPIRE_PASSWORD` (65536) bit in `userAccountControl`
+3. **Data Collection**: Retrieves name, DN, creation timestamp, last logon, password-last-set and account status in a single paged search, with no per-object round trips
+4. **Date Processing**: Converts FileTime and GeneralizedTime values to readable UTC timestamps
+5. **CSV Export**: Generates the report with UTF-8 encoding
 
 **Note**: If neither `-IncludeUsers` nor `-IncludeComputers` is specified, both are included by default.
 
+---
+
+## Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| `-DomainInput` | Domain name (`example.com`) or distinguished name (`DC=example,DC=com`). Prompts with the current domain as default when omitted. |
+| `-Server` | Optional domain controller to query directly (`dc01.example.com` or `dc01.example.com:636`). |
+| `-OutputPath` | CSV output path. Defaults to `.\PwdNeverExpires_<domain>.csv`. |
+| `-IncludeUsers` | Query user accounts only. |
+| `-IncludeComputers` | Query computer accounts only. |
+
+---
+
 ## Usage
 
-### Interactive Mode 
-**Prompts for domain selection and includes all account types**
+### Interactive Mode
+Prompts for domain selection and includes all account types:
 ```powershell
-.\PasswordNeverExpires.ps1
+.\PwdNeverExpires.ps1
 ```
-
 
 ### Specific Domain Analysis
 ```powershell
-.\PasswordNeverExpires.ps1 -DomainInput "example.com"
+.\PwdNeverExpires.ps1 -DomainInput "example.com"
 ```
+
 ### Users Only
-
 ```powershell
-.\PasswordNeverExpires.ps1 -IncludeUsers -OutputPath "C:\Audit\UsersNeverExpire.csv"
+.\PwdNeverExpires.ps1 -IncludeUsers -OutputPath "C:\Audit\UsersNeverExpire.csv"
 ```
-### Computers Only
 
+### Computers Only
 ```powershell
-.\PasswordNeverExpires.ps1 -IncludeComputers -DomainInput "subsidiary.company.com"
+.\PwdNeverExpires.ps1 -IncludeComputers -DomainInput "subsidiary.company.com"
 ```
 
 ### Cross-Domain Analysis
 ```powershell
-.\PasswordNeverExpiresAnalyzer.ps1 -DomainInput "DC=remote,DC=domain,DC=com" -IncludeUsers
+.\PwdNeverExpires.ps1 -DomainInput "DC=remote,DC=domain,DC=com" -IncludeUsers
 ```
+
+### Query a Specific Domain Controller
+```powershell
+.\PwdNeverExpires.ps1 -DomainInput "example.com" -Server "dc01.example.com"
+```
+
+---
+
 ## Example Output
 
-| Name | Creation | LastLogon | PwdLastSet | DistinguishedName |
-|------|----------|-----------|------------|-------------------|
-| ServiceAccount | 2020-01-15 08:30:00 | 2025-01-20 14:22:15 | 2020-01-15 08:30:00 | CN=ServiceAccount,OU=Service_Accounts,DC=company,DC=com |
-| LegacyApp | 2018-05-10 12:00:00 | | 2018-05-10 12:00:00 | CN=LegacyApp,OU=Applications,DC=company,DC=com |
-| AdminUser | 2019-03-20 09:15:30 | 2025-01-25 11:45:22 | 2019-03-20 09:15:30 | CN=AdminUser,OU=Administrators,DC=company,DC=com |
-| TestComputer$ | 2021-07-08 16:20:00 | 2024-12-15 10:30:45 | 2021-07-08 16:20:00 | CN=TestComputer,OU=Workstations,DC=company,DC=com |
+| Name | Type | Enabled | Creation | LastLogon | PwdLastSet | DistinguishedName |
+|------|------|---------|----------|-----------|------------|-------------------|
+| ServiceAccount | User | True | 2020-01-15 08:30:00 | 2025-01-20 14:22:15 | 2020-01-15 08:30:00 | CN=ServiceAccount,OU=Service_Accounts,DC=company,DC=com |
+| LegacyApp | User | False | 2018-05-10 12:00:00 | | 2018-05-10 12:00:00 | CN=LegacyApp,OU=Applications,DC=company,DC=com |
+| AdminUser | User | True | 2019-03-20 09:15:30 | 2025-01-25 11:45:22 | 2019-03-20 09:15:30 | CN=AdminUser,OU=Administrators,DC=company,DC=com |
+| TestComputer$ | Computer | True | 2021-07-08 16:20:00 | 2024-12-15 10:30:45 | 2021-07-08 16:20:00 | CN=TestComputer,OU=Workstations,DC=company,DC=com |
 
-
+---
 
 ## Requirements & Notes
 - **PowerShell 5.1 or higher** (uses .NET DirectoryServices classes)
-- **Domain-joined machine** or network connectivity to target domain
-- **Read permissions** on Active Directory (typically Domain Users sufficient)
+- **Domain-joined machine** or network connectivity to the target domain
+- **Read permissions** on Active Directory (typically Domain Users is sufficient)
 - **LDAP connectivity** on port 389 (or 636 for LDAPS)
-
+- `lastLogon` is not replicated between domain controllers; `lastLogonTimestamp` (used first) is replicated but may lag up to 14 days behind the actual last logon
 
 ---
 
 ## Security Implications
 
-### Why Password Never Expires is Dangerous
-Accounts with **Password Never Expires** flag represent significant security risks:
-- **Static credentials** that may be discovered through various attack vectors
-- **Privilege escalation opportunities** if service accounts have elevated permissions
-- **Persistence mechanisms** for attackers who compromise these accounts
-- **Compliance violations** in environments with password rotation requirements
-
 ### Common Attack Scenarios
-Attackers targeting password never expires accounts typically follow these patterns:
+Attackers targeting password-never-expires accounts typically follow these patterns:
 1. **Service Account Compromise**: Target service accounts with never-expiring passwords through credential stuffing or password spraying
 2. **Dormant Account Exploitation**: Discover abandoned accounts that become backdoors into the environment
 3. **Lateral Movement**: Use compromised never-expire accounts to traverse network segments
@@ -136,14 +128,15 @@ This creates a **persistent attack surface** that remains stable for extended pe
 - **Regular password rotation** for all service accounts (use Group Managed Service Accounts where possible)
 - **Account lifecycle management** to identify and disable dormant accounts:
 ```powershell
+$Results = Import-Csv .\PwdNeverExpires_example_com.csv
 $StaleAccounts = $Results | Where-Object {
-$.LastLogon -lt (Get-Date).AddDays(-90) -or $null -eq $.LastLogon
+    -not $_.LastLogon -or [datetime]$_.LastLogon -lt (Get-Date).AddDays(-90)
 }
 ```
 - **Privilege review** to ensure accounts have minimum required permissions
 - **Monitoring implementation** for unusual logon patterns from these accounts:
-- Set up alerts for logons from never-expire accounts outside business hours
-- Monitor for multiple failed logon attempts on service accounts
-- Track privilege escalation attempts from these accounts
+  - Set up alerts for logons from never-expire accounts outside business hours
+  - Monitor for multiple failed logon attempts on service accounts
+  - Track privilege escalation attempts from these accounts
 - **Compliance alignment** with organizational password policies
 - **Group Managed Service Accounts (gMSA)** implementation where possible to eliminate static passwords entirely
